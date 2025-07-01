@@ -1,0 +1,73 @@
+version: "3.9"
+
+############################
+#   networks
+############################
+networks:
+  partners_bridge:
+    driver: bridge
+
+############################
+#   services
+############################
+services:
+
+  ##################################
+  # StatCollector
+  ##################################
+  statcollector:
+    build: ./StatCollector
+    restart: unless-stopped
+    networks:
+      - partners_bridge
+    extra_hosts:                       # Linux-хак: «хост» внутри контейнера
+      - "host.docker.internal:host-gateway"
+    environment:
+      # ----- DB -----
+      DB_LOGIN:       "gsheet_collector"
+      DB_PASSWORD:    "BHOHAhsk414"
+      DB_HOST:        "host.docker.internal"   # ← так мы попадаем в ваш localhost
+      DB_PORT:        "5432"
+      DB_NAME:        "partners_base"
+      # ----- Source -----
+      GSHEET_LINK: "https://script.google.com/macros/s/AKfycbzTVmhtm5Ft5M9aAkeH0J9-0Svo2Zsudlp4C5fyNa1XNWl8dFxJ9b3em29dCv2ncuv-/exec"
+
+  ##################################
+  # NotifierBot
+  ##################################
+  notifierbot:
+    build: ./NotifierBot
+    restart: unless-stopped
+    networks:
+      - partners_bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      BOT_TOKEN: "7661680889:AAGhB3438QbXPPmOh-zDqngqEHUOK1T6Skw"
+      TELEGRAM_RECIPIENT_IDS: "[495060107, 469231377]"
+
+  ##################################
+  # PartnerBot
+  ##################################
+  partnerbot:
+    build: ./PartnerBot
+    restart: unless-stopped
+    networks:
+      - partners_bridge
+    depends_on:
+      - notifierbot                    # ждём, пока тот хотя бы стартанёт
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # ----- DB -----
+      DB_LOGIN:     "bot_user"
+      DB_PASSWORD:  "GJS$#sljv1S"
+      DB_HOST:      "host.docker.internal"
+      DB_PORT:      "5432"
+      DB_NAME:      "partners_base"
+      # ----- Telegram -----
+      BOT_TOKEN:    "7424555942:AAEUJfc8jyTWTAZJcfNwYRaO5WMYOo3rcrc"
+      BOT_NAME:     "PartnerSkyfort_bot"
+      # ----- Взаимодействие с Notifier -----
+      NOTIFIER_HOST: "notifierbot"     # имя контейнера внутри bridge-сети
+      NOTIFIER_PORT: "2948"
